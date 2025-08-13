@@ -14,7 +14,7 @@ async function startServer(): Promise<void> {
     const server = app.getApp().listen(PORT, () => {
       logger.info(`Server started successfully`, {
         port: PORT,
-        environment: 'development',
+        environment: process.env.NODE_ENV || 'development',
         timestamp: new Date().toISOString(),
       });
     });
