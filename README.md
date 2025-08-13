@@ -1,304 +1,291 @@
-# Helio AI Agent v2
+## Lio: The Helio AI Agent (for Shopify) — witty, gritty, and agent-y
 
-A professional AI agent system built with Node.js, TypeScript, and LangChain, featuring advanced tool calling, memory management, and graph-based execution.
+Meet Lio, your slightly over-caffeinated agent for the Helio AI platform. Lio analyzes campaigns, summarizes chats, and soon will build segments, chatflows, and journeys like it’s meal prep Sunday.
 
-## 🚀 Features
+If your Shopify store wants fewer “why is deliverability sad?” moments and more “oh wow, look at that CTR” celebrations, you’re in the right repo.
 
-### Core AI Agent Capabilities
+### TL;DR
 
-- **Multi-Tool Support**: Books search, payment refunds, weather info, calculations
-- **Memory Management**: Conversation history with BufferMemory
-- **Retry Logic**: Automatic retry with exponential backoff
-- **Graph Execution**: StateGraph-based workflow orchestration
-- **Session Management**: Multi-session support with automatic cleanup
-- **RESTful API**: Complete chat API with session management
+- Runs an Express API on port 8080 with `/api/chat` as the main entrypoint
+- Uses OpenAI for reasoning and tools for data-fetching/analysis
+- Stores session history in Redis (optional) and data in MongoDB
+- Ships with a production-grade Campaign Analyzer tool
+- Built to be extended with more agentic tools (segments, chat analyzer, builders)
 
-### Available Tools
+---
 
-- 📚 **Books Tool**: Search Google Books API (example)
-- 📊 **Campaign Analyzer Tool**: Deep analytics for campaigns, templates, messages, and attribution
+## Table of Contents
 
-## 📁 Project Structure
+- Overview
+- Architecture
+- Endpoints
+- Setup & Run
+- Environment
+- Tools & Extensibility
+- Campaign Analyzer (P1)
+- Roadmap (P1/P2)
+- Security & Privacy
+- Troubleshooting
+- Contributing
 
-```
-helio-ai-agentv2/
-├── src/
-│   ├── agent/                 # AI Agent System
-│   │   ├── config/           # Configuration files
-│   │   ├── core/             # Core agent implementation
-│   │   ├── services/         # Business logic services
-│   │   ├── tools/            # Available tools
-│   │   ├── types/            # TypeScript definitions
-│   │   ├── utils/            # Utility functions
-│   │   ├── examples/         # Usage examples
-│   │   ├── test/             # Test files
-│   │   └── README.md         # Agent documentation
-│   ├── routes/               # API routes
-│   ├── core/                 # Core application logic
-│   ├── database/             # Database schemas
-│   ├── utils/                # Shared utilities
-│   └── index.ts              # Application entry point
-├── scripts/                  # Utility scripts
-├── dist/                     # Compiled output
-└── README.md                 # This file
-```
+---
 
-## 🛠️ Installation
+## Overview
 
-1. **Clone the repository**
+Lio is an agentic backend for Helio AI to help Shopify brands:
 
-   ```bash
-   git clone <repository-url>
-   cd helio-ai-agentv2
-   ```
+- Analyze WhatsApp campaigns (deliverability, engagement, error-code insights) and recommend fixes
+- Summarize chats and generate responses
+- Soon: build segments, chatflows, and customer journeys with prompt-driven UX
 
-2. **Install dependencies**
+Lio’s brain is OpenAI; its hands are “tools” (database-backed functions) orchestrated by an execution graph.
 
-   ```bash
-   yarn install
-   ```
+---
 
-3. **Set up environment variables**
+## Architecture
 
-   ```bash
-   cp env.example .env
-   # Edit .env with your API keys and configuration
-   ```
+### Component map
 
-4. **Start the development server**
-   ```bash
-   yarn dev
-   ```
-
-## 🔧 Configuration
-
-### Required Environment Variables
-
-```env
-# OpenAI Configuration
-OPENAI_API_KEY=your_openai_api_key
-OPENAI_MODEL=gpt-5-mini
-OPENAI_ORG_ID=your_openai_org_id
-
-# Agent Configuration
-AGENT_TEMPERATURE=0
-AGENT_MAX_TOKENS=4000
-AGENT_MEMORY_ENABLED=true
-AGENT_RETRY_ENABLED=true
-AGENT_MAX_RETRIES=3
-
-# External APIs
-GOOGLE_API_KEY=your_google_api_key
-STRIPE_API_KEY=your_stripe_api_key
-
-# Session Configuration
-MAX_SESSIONS=1000
-SESSION_TIMEOUT=3600000
-MEMORY_LIMIT=50
-
-# Database & Redis
-MONGO_URI=your_mongodb_uri
-REDIS_HOST=your_redis_host
-REDIS_PORT=6379
-REDIS_PASSWORD=your_redis_password
+```mermaid
+graph LR
+  A[Client / Shopify App / Helio UI] -->|POST /api/chat| B(Express Server)
+  B --> C[AgentService]
+  C --> D[AgentEngine]
+  D --> O[(OpenAI)]
+  D --> TM[ToolManager]
+  TM --> T1[CampaignAnalyzerTool]
+  T1 --> M[(MongoDB)]
+  D --> R[(Redis SessionStore)]
+  D --> B
 ```
 
-## 📡 API Endpoints
+### Request flow (high-level)
 
-### Chat API
+```mermaid
+sequenceDiagram
+  participant U as Client
+  participant API as Express /api
+  participant S as AgentService
+  participant E as AgentEngine
+  participant O as OpenAI
+  participant TM as ToolManager
+  participant T as CampaignAnalyzerTool
+  participant DB as MongoDB
+  participant R as Redis
 
-#### `POST /api/chat`
+  U->>API: POST /api/chat { message, sessionId?, context? }
+  API->>S: processChat()
+  S->>R: append user msg to history (best-effort)
+  S->>E: processMessage(message, sessionId, context)
+  E->>O: chat.completions (with tool specs)
+  O-->>E: message + optional tool_calls
+  E->>TM: resolve tool
+  E->>T: execute({ widgetId, timeRange, flags })
+  T->>DB: query campaigns/messages/attribution
+  T-->>E: analysis result
+  E->>O: final synthesis (tool_choice: none)
+  O-->>E: answer text
+  E-->>S: { response, metadata }
+  S->>R: append assistant reply (best-effort)
+  S-->>API: ChatResponse
+  API-->>U: 200 OK { success: true, data }
+```
 
-Main chat endpoint for interacting with the AI agent.
+Key internals:
 
-**Request:**
+- `src/routes/chat.routes.ts`: HTTP routes mounted at `/api`
+- `AgentService`: orchestrates tools and sessions
+- `AgentEngine`: manages LLM calls, tool-calls, graph execution, metrics
+- `ToolManager`: registers and configures tools
+- `CampaignAnalyzerTool`: production-grade analyzer for campaigns
+- `SessionStore` (Redis): maintains short chat history for context-awareness
+
+---
+
+## Endpoints
+
+- POST `/api/chat`
+  - Body: `{ message: string, sessionId?: string, context?: Record<string, any> }`
+  - Returns: `{ response, sessionId, metadata, context? }`
+  - Notes: Include `context.widgetId` for campaign analysis; persisted into session metadata.
+
+- GET `/api/chat/session/:sessionId`
+  - Returns current session snapshot.
+
+- DELETE `/api/chat/session/:sessionId`
+  - Clears a session.
+
+- GET `/api/chat/stats`
+  - Returns runtime metrics (requests, sessions, tool stats).
+
+- GET `/api/chat/health`
+  - Simple health signal for the chat service.
+
+Example request
+
+```bash
+curl -X POST http://localhost:8080/api/chat \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "message": "Compare my last 2 campaigns and tell me why deliverability dipped.",
+    "context": { "widgetId": "507f1f77bcf86cd799439011", "store": "my-shopify-store" }
+  }'
+```
+
+---
+
+## Setup & Run
+
+Prerequisites
+
+- Node 18+ and Yarn 1.x
+- MongoDB (URI in env)
+- Redis optional (recommended for session history)
+- OpenAI API key
+
+Install
+
+```bash
+yarn
+```
+
+Configure env
+
+```bash
+cp env.example .env
+# fill OPENAI_API_KEY, MONGO_URI, etc.
+```
+
+Run
+
+```bash
+yarn dev        # dev with nodemon on :8080
+yarn build      # compile to dist
+yarn start      # run dist/index.js
+```
+
+Quality
+
+```bash
+yarn lint
+yarn typecheck
+yarn format
+```
+
+---
+
+## Environment
+
+From `env.example` (most important vars):
+
+- OPENAI_API_KEY, OPENAI_MODEL (default `gpt-5-mini`)
+- MONGO_URI, DB_NAME
+- REDIS_HOST, REDIS_PORT, REDIS_PASSWORD, REDIS_DB (optional)
+- AGENT_TEMPERATURE, AGENT_MAX_TOKENS, AGENT_MEMORY_ENABLED, AGENT_RETRY_ENABLED
+- MAX_SESSIONS, SESSION_TIMEOUT, MEMORY_LIMIT
+
+---
+
+## Tools & Extensibility
+
+Tools are classes extending `BaseTool` and registered via `ToolManager`.
+
+- Auto-registered in `AgentService` using `ToolFactory`
+- Each tool exposes:
+  - `execute(input)` with retry, caching, and rate limits
+  - `getOpenAIFunctionSpec()` for function/tool calling
+
+Add a tool (sketch):
+
+1. Create `src/agent/tools/my-tool.ts` with a subclass of `BaseTool`
+2. Export in `src/agent/tools/index.ts` and add to `ToolFactory.toolClasses`
+3. Restart the server (auto-registration on boot)
+
+---
+
+## Campaign Analyzer (P1)
+
+The star of the show today.
+
+Name: `analyzeCampaigns` (category: `analytics`)
+
+Inputs
+
+- `widgetId` (required): MongoDB ObjectId of the Helio widget
+- `timeRange` (optional): one of `7d | 14d | 30d | 90d | all` (default `14d`)
+- `includeFailed` (default true)
+- `includeMessages` (default true)
+- `includeAttribution` (default true)
+
+What it does
+
+- Queries campaigns, templates, messages, and attribution
+- Computes delivery/read/click rates, engagement, failures
+- Surfaces error codes like 131049/131048/131026 with root causes and fixes
+- Returns optimization suggestions and best/worst performers
+
+Example tool-call (conceptual)
 
 ```json
 {
-  "message": "Analyze last 7 days of campaigns for widgetId 507f1f77bcf86cd799439011",
-  "sessionId": "optional-session-id",
-  "context": {}
-}
-```
-
-**Response:**
-
-```json
-{
-  "success": true,
-  "data": {
-    "response": "I found these books about AI...",
-    "sessionId": "session_1234567890_abc123",
-    "timestamp": "2024-01-01T12:00:00.000Z",
-    "metadata": {
-      "toolsUsed": ["searchBooks"],
-      "memorySize": 5
-    }
+  "tool": "analyzeCampaigns",
+  "args": {
+    "widgetId": "507f1f77bcf86cd799439011",
+    "timeRange": "30d",
+    "includeFailed": true,
+    "includeMessages": true,
+    "includeAttribution": true
   }
 }
 ```
 
-#### `GET /api/chat/session/:sessionId`
+LLM prompt policy (summarized)
 
-Get session information and memory.
+- Prefer tools when data is needed; do not leak internal IDs
+- Default time range to 14d; reuse cached results in-session
+- Output is concise with sections: Summary, Problems, Root causes, Optimizations, Attribution
 
-#### `DELETE /api/chat/session/:sessionId`
+---
 
-Clear session and memory.
+## Roadmap
 
-#### `GET /api/chat/stats`
+- P1 — Campaign analyzer and builder
+  - Analyze two campaigns, explain deliverability, error codes, optimization paths
+  - Campaign creator: suggest templates, best send times, target segment (segment recos are P2)
+- P1 — Chat Analyzer
+  - Summarize all conversations, surface pain points, generate AI responses
+- P2 — Segment analyzer and builder
+  - Example: “past 2 campaigns” behavior over a segment, interaction lift, build segments
+- P2 — Chatflow builder with prompt
+- P2 — Journey Builder with prompt
 
-Get agent statistics and session information.
+Status today: Campaign Analyzer is implemented. Others are stubs-to-be.
 
-#### `GET /api/chat/health`
+---
 
-Health check for the chat service.
+## Security & Privacy
 
-### Health Check
+- Sensitive IDs like `widgetId` are redacted from final answers
+- Redis is optional; if missing, history falls back to stateless behavior
+- Validate all inputs server-side; tool calls enforce `widgetId`
 
-- `GET /health` - Application health check
+---
 
-## 🧪 Testing
+## Troubleshooting
 
-### Run Agent Tests
+- “OPENAI_API_KEY is not set” — fill `.env`
+- “Database not connected” — ensure `MONGO_URI` reachable and MongoDB is running
+- Redis errors? Service runs without Redis; history simply won’t persist
+- 500s on `/api/chat` — check server logs; enable `LOG_LEVEL=info` or higher
 
-```bash
-yarn test:agent
-```
+---
 
-### Manual Testing with curl
+## Contributing
 
-```bash
-# Basic chat
-curl -X POST http://localhost:8080/api/chat \
-  -H "Content-Type: application/json" \
-  -d '{
-    "message": "Search for books about machine learning"
-  }'
+Bring your tools. Prefer:
 
-# Session management
-curl http://localhost:8080/api/chat/session/session_123
-curl -X DELETE http://localhost:8080/api/chat/session/session_123
-curl http://localhost:8080/api/chat/stats
-```
+- Descriptive names, explicit types, early returns
+- No swallowing errors; meaningful logging
+- Lint clean, type safe, and documented
 
-## 🔄 Development
-
-### Adding New Tools
-
-1. Create a new tool file in `src/agent/tools/`
-2. Export the tool from `src/agent/tools/index.ts`
-3. Add the tool to the agent in `src/agent/core/agent.ts`
-
-Example:
-
-```typescript
-import { tool } from '@langchain/core/tools';
-import { z } from 'zod';
-
-export const myTool = tool(
-  async (input: unknown) => {
-    const { param } = input as { param: string };
-    // Tool logic here
-    return JSON.stringify(result);
-  },
-  {
-    name: 'myTool',
-    description: 'Description of what this tool does',
-    schema: z.object({
-      param: z.string().describe('Parameter description'),
-    }),
-  },
-);
-```
-
-### Project Scripts
-
-- `yarn dev` - Start development server
-- `yarn build` - Build for production
-- `yarn start` - Start production server
-- `yarn test:agent` - Run agent tests
-
-## 🏗️ Architecture
-
-### Agent System Components
-
-1. **Core Agent** (`src/agent/core/agent.ts`)
-   - LLM initialization and configuration
-   - Tool integration and management
-   - Memory and retry logic
-   - Graph-based execution
-
-2. **Tools** (`src/agent/tools/`)
-   - Modular tool implementations
-   - Error handling and logging
-   - Type-safe schemas
-
-3. **Services** (`src/agent/services/`)
-   - Business logic layer
-   - Session management
-   - Agent lifecycle management
-
-4. **API Layer** (`src/routes/`)
-   - RESTful endpoints
-   - Request/response handling
-   - Error management
-
-### Data Flow
-
-```
-User Request → API Route → Agent Service → Core Agent → Tools → Response
-     ↓              ↓           ↓            ↓         ↓        ↓
-Session Mgmt → Validation → Processing → Execution → Results → Format
-```
-
-## 🔒 Security
-
-- **Input Validation**: All inputs are validated
-- **API Key Management**: Secure environment variable usage
-- **Session Isolation**: Sessions are isolated from each other
-- **Error Sanitization**: Sensitive information is not exposed
-- **Rate Limiting**: Built-in rate limiting support
-
-## 📊 Monitoring
-
-- **Structured Logging**: All operations are logged
-- **Health Checks**: Built-in health monitoring
-- **Session Statistics**: Real-time session monitoring
-- **Error Tracking**: Comprehensive error handling
-
-## 🚀 Deployment
-
-### Docker
-
-```bash
-docker build -t helio-ai-agent .
-docker run -p 8080:8080 helio-ai-agent
-```
-
-### Environment Setup
-
-1. Set all required environment variables
-2. Ensure external APIs are accessible
-3. Configure database and Redis connections
-4. Set up monitoring and logging
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
-
-## 📄 License
-
-This project is licensed under the MIT License.
-
-## 🆘 Support
-
-For support and questions:
-
-- Check the [Agent Documentation](src/agent/README.md)
-- Review the API documentation
-- Check the example files in `src/agent/examples/`
+If you ship a tool that increases deliverability and revenue, Lio will name a variable after you. Maybe.
