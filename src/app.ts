@@ -59,7 +59,7 @@ export class App {
       }),
     );
 
-    // Body parsing middleware
+    // Body parsing middlewares
     this.app.use(express.json({ limit: '10mb' }));
     this.app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
