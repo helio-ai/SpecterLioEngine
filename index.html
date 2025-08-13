@@ -1,0 +1,513 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Campaign Agent Chat</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background: #f5f5f5;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .container {
+        max-width: 800px;
+        margin: 0 auto;
+        background: white;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+      }
+
+      .header {
+        background: #2c3e50;
+        color: white;
+        padding: 20px;
+        text-align: center;
+      }
+
+      .chat-container {
+        flex: 1;
+        overflow-y: auto;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+      }
+
+      .message {
+        padding: 12px 16px;
+        border-radius: 12px;
+        max-width: 80%;
+        word-wrap: break-word;
+      }
+
+      .user-message {
+        background: #3498db;
+        color: white;
+        align-self: flex-end;
+        margin-left: auto;
+      }
+
+      .bot-message {
+        background: #ecf0f1;
+        color: #2c3e50;
+        align-self: flex-start;
+      }
+
+      .input-container {
+        padding: 20px;
+        border-top: 1px solid #eee;
+        background: white;
+      }
+
+      .input-group {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 10px;
+      }
+
+      .input-field {
+        flex: 1;
+        padding: 12px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        font-size: 14px;
+      }
+
+      .input-field:focus {
+        outline: none;
+        border-color: #3498db;
+      }
+
+      .btn {
+        padding: 12px 20px;
+        background: #3498db;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 14px;
+        transition: background 0.2s;
+      }
+
+      .btn:hover {
+        background: #2980b9;
+      }
+
+      .btn:disabled {
+        background: #bdc3c7;
+        cursor: not-allowed;
+      }
+
+      .product-preview {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 15px;
+        margin: 10px 0;
+      }
+
+      .product-preview h4 {
+        color: #2c3e50;
+        margin-bottom: 10px;
+      }
+
+      .product-image {
+        max-width: 100px;
+        height: auto;
+        border-radius: 4px;
+        margin-right: 10px;
+      }
+
+      .product-info {
+        display: flex;
+        align-items: center;
+        margin-bottom: 10px;
+      }
+
+      .product-details {
+        flex: 1;
+      }
+
+      .product-price {
+        font-weight: bold;
+        color: #27ae60;
+      }
+
+      .loading {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 3px solid #f3f3f3;
+        border-top: 3px solid #3498db;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+
+      .error {
+        background: #e74c3c;
+        color: white;
+        padding: 10px;
+        border-radius: 8px;
+        margin: 10px 0;
+      }
+
+      .markdown-content {
+        line-height: 1.6;
+      }
+
+      .markdown-content h1,
+      .markdown-content h2,
+      .markdown-content h3 {
+        margin: 10px 0 5px 0;
+        color: #2c3e50;
+      }
+
+      .markdown-content p {
+        margin: 8px 0;
+      }
+
+      .markdown-content ul,
+      .markdown-content ol {
+        margin: 8px 0;
+        padding-left: 20px;
+      }
+
+      .markdown-content code {
+        background: #f8f9fa;
+        padding: 2px 4px;
+        border-radius: 4px;
+        font-family: 'Courier New', monospace;
+      }
+
+      .markdown-content pre {
+        background: #f8f9fa;
+        padding: 10px;
+        border-radius: 4px;
+        overflow-x: auto;
+        margin: 10px 0;
+      }
+
+      .markdown-content blockquote {
+        border-left: 4px solid #3498db;
+        padding-left: 15px;
+        margin: 10px 0;
+        color: #7f8c8d;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>Campaign Agent Chat</h1>
+        <p>AI-powered campaign optimization assistant</p>
+      </div>
+
+      <div class="chat-container" id="chatContainer">
+        <div class="message bot-message">
+          <div class="markdown-content">
+            Hello! I'm your campaign optimization assistant. I can help you analyze and optimize
+            your marketing campaigns. Please provide your widget ID and tell me what you'd like to
+            achieve with your campaign.
+          </div>
+        </div>
+      </div>
+
+      <div class="input-container">
+        <div class="input-group">
+          <input
+            type="text"
+            id="widgetId"
+            class="input-field"
+            placeholder="Widget ID (required)"
+            required
+          />
+          <input
+            type="text"
+            id="threadId"
+            class="input-field"
+            placeholder="Thread ID (optional)"
+            value="test-thread-456"
+          />
+        </div>
+
+        <div class="input-group">
+          <textarea
+            id="goal"
+            class="input-field"
+            placeholder="What would you like to achieve with your campaign? (required)"
+            rows="3"
+            required
+          ></textarea>
+        </div>
+
+        <div class="input-group">
+          <textarea
+            id="productJson"
+            class="input-field"
+            placeholder="Product JSON (optional) - Paste your product data here"
+            rows="8"
+          ></textarea>
+        </div>
+
+        <div id="productPreview" class="product-preview" style="display: none">
+          <h4>Product Preview</h4>
+          <div id="productPreviewContent"></div>
+        </div>
+
+        <div class="input-group">
+          <button id="sendBtn" class="btn" onclick="sendMessage()">Send Message</button>
+          <button id="clearBtn" class="btn" onclick="clearChat()" style="background: #95a5a6">
+            Clear Chat
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      let isStreaming = false;
+      let currentSessionId = '';
+
+      // Configure marked for markdown rendering
+      marked.setOptions({
+        breaks: true,
+        gfm: true,
+      });
+
+      function addMessage(content, isUser = false) {
+        const chatContainer = document.getElementById('chatContainer');
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
+
+        if (isUser) {
+          messageDiv.textContent = content;
+        } else {
+          messageDiv.innerHTML = `<div class="markdown-content">${marked.parse(content)}</div>`;
+        }
+
+        chatContainer.appendChild(messageDiv);
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+      }
+
+      function addStreamingMessage() {
+        const chatContainer = document.getElementById('chatContainer');
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'message bot-message';
+        messageDiv.id = 'streaming-message';
+        messageDiv.innerHTML =
+          '<div class="markdown-content"><span class="loading"></span> Thinking...</div>';
+        chatContainer.appendChild(messageDiv);
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+        return messageDiv;
+      }
+
+      function updateStreamingMessage(content) {
+        const streamingMessage = document.getElementById('streaming-message');
+        if (streamingMessage) {
+          streamingMessage.innerHTML = `<div class="markdown-content">${marked.parse(
+            content,
+          )}</div>`;
+        }
+      }
+
+      function showError(message) {
+        const chatContainer = document.getElementById('chatContainer');
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'error';
+        errorDiv.textContent = message;
+        chatContainer.appendChild(errorDiv);
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+      }
+
+      function validateInputs() {
+        const widgetId = document.getElementById('widgetId').value.trim();
+        const goal = document.getElementById('goal').value.trim();
+
+        if (!widgetId) {
+          showError('Widget ID is required');
+          return false;
+        }
+
+        if (!goal) {
+          showError('Goal is required');
+          return false;
+        }
+
+        return true;
+      }
+
+      function parseProductJson() {
+        const productJson = document.getElementById('productJson').value.trim();
+        if (!productJson) return null;
+
+        try {
+          return JSON.parse(productJson);
+        } catch (error) {
+          showError('Invalid JSON format in product data');
+          return null;
+        }
+      }
+
+      function updateProductPreview() {
+        const productJson = document.getElementById('productJson').value.trim();
+        const previewDiv = document.getElementById('productPreview');
+        const previewContent = document.getElementById('productPreviewContent');
+
+        if (!productJson) {
+          previewDiv.style.display = 'none';
+          return;
+        }
+
+        try {
+          const product = JSON.parse(productJson);
+          previewDiv.style.display = 'block';
+
+          let previewHTML = `
+                    <div class="product-info">
+                        ${
+                          product.image
+                            ? `<img src="${product.image}" alt="${product.name}" class="product-image">`
+                            : ''
+                        }
+                        <div class="product-details">
+                            <strong>${product.name || 'Product Name'}</strong><br>
+                            <span class="product-price">₹${product.price || '0.00'}</span>
+                            ${
+                              product.compare_at_price
+                                ? `<span style="text-decoration: line-through; color: #7f8c8d; margin-left: 10px;">₹${product.compare_at_price}</span>`
+                                : ''
+                            }
+                        </div>
+                    </div>
+                    <div><strong>Type:</strong> ${product.type || 'N/A'}</div>
+                    <div><strong>Tags:</strong> ${product.tags || 'N/A'}</div>
+                `;
+
+          previewContent.innerHTML = previewHTML;
+        } catch (error) {
+          previewDiv.style.display = 'none';
+        }
+      }
+
+      async function sendMessage() {
+        if (!validateInputs() || isStreaming) return;
+
+        const widgetId = document.getElementById('widgetId').value.trim();
+        const goal = document.getElementById('goal').value.trim();
+        const threadId = document.getElementById('threadId').value.trim() || 'test-thread-456';
+        const product = parseProductJson();
+
+        if (product === false) return; // JSON parsing failed
+
+        // Add user message
+        addMessage(goal, true);
+
+        // Clear input
+        document.getElementById('goal').value = '';
+        document.getElementById('productJson').value = '';
+        document.getElementById('productPreview').style.display = 'none';
+
+        // Disable send button
+        const sendBtn = document.getElementById('sendBtn');
+        sendBtn.disabled = true;
+        sendBtn.textContent = 'Sending...';
+        isStreaming = true;
+
+        // Add loading indicator
+        const streamingMessage = addStreamingMessage();
+
+        try {
+          const payload = {
+            message: goal,
+            sessionId: currentSessionId || threadId,
+            context: {
+              widgetId,
+              product,
+            },
+          };
+
+          const response = await fetch('http://localhost:8080/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+
+          if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(`HTTP ${response.status}: ${errText}`);
+          }
+
+          const json = await response.json();
+          if (!json.success) {
+            throw new Error(json.error?.message || 'Unknown error');
+          }
+
+          const data = json.data;
+          const fullResponse = data.response;
+
+          // Track session for continuity
+          currentSessionId = data.sessionId;
+          const threadInput = document.getElementById('threadId');
+          if (threadInput && !threadInput.value) threadInput.value = currentSessionId;
+
+          streamingMessage.remove();
+          addMessage(fullResponse);
+        } catch (error) {
+          console.error('Error:', error);
+          streamingMessage.remove();
+          showError(`Error: ${error.message}`);
+        } finally {
+          // Re-enable send button
+          sendBtn.disabled = false;
+          sendBtn.textContent = 'Send Message';
+          isStreaming = false;
+        }
+      }
+
+      function clearChat() {
+        const chatContainer = document.getElementById('chatContainer');
+        chatContainer.innerHTML = `
+                <div class="message bot-message">
+                    <div class="markdown-content">
+                        Hello! I'm your campaign optimization assistant. I can help you analyze and optimize your marketing campaigns. 
+                        Please provide your widget ID and tell me what you'd like to achieve with your campaign.
+                    </div>
+                </div>
+            `;
+      }
+
+      // Add event listeners
+      document.getElementById('productJson').addEventListener('input', updateProductPreview);
+      document.getElementById('goal').addEventListener('keypress', function (e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          sendMessage();
+        }
+      });
+
+      // Set default widget ID for testing
+      document.getElementById('widgetId').value = '678f1fafedc19743b13baaf2';
+    </script>
+  </body>
+</html>

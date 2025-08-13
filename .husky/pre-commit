@@ -1,0 +1,22 @@
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
+set -e
+
+echo 'Formatting staged files with Prettier...'
+STAGED_ALL=$(git diff --cached --name-only --diff-filter=ACMR)
+STAGED_FORMAT=$(echo "$STAGED_ALL" | grep -E '\.(ts|tsx|js|jsx|json|md|css|scss|html|yml|yaml)$' || true)
+if [ -n "$STAGED_FORMAT" ]; then
+  echo "$STAGED_FORMAT" | xargs prettier --write
+  echo "$STAGED_FORMAT" | xargs git add
+fi
+
+echo 'Auto-fixing ESLint for staged TypeScript files...'
+STAGED_TS=$(echo "$STAGED_ALL" | grep -E '\.(ts|tsx)$' || true)
+if [ -n "$STAGED_TS" ]; then
+  echo "$STAGED_TS" | xargs eslint --fix
+  echo "$STAGED_TS" | xargs git add
+fi
+
+echo 'Running lint and typecheck...'
+yarn lint && yarn typecheck
