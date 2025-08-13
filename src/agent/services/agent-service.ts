@@ -227,7 +227,7 @@ export class AgentService {
           responseTime,
           toolsUsed: result.metadata.toolsUsed,
           memorySize: result.metadata.memorySize,
-          model: this.config.engine.model || 'gpt-5-mini',
+          model: 'lio-beta-0.1.0',
         },
         context: request.context,
       };

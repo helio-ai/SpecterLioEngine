@@ -447,7 +447,10 @@
             },
           };
 
-          const response = await fetch('http://localhost:8080/api/chat', {
+          // const baseUrl = 'http://localhost:8080/api/chat';
+          const baseUrl = 'https://specter-lio-816133968012.asia-south1.run.app/api/chat';
+
+          const response = await fetch(baseUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
@@ -490,7 +493,7 @@
         chatContainer.innerHTML = `
                 <div class="message bot-message">
                     <div class="markdown-content">
-                        Hello! I'm your campaign optimization assistant. I can help you analyze and optimize your marketing campaigns. 
+                        Hello! I'm your campaign optimization assistant. I can help you analyze and optimize your marketing campaigns.
                         Please provide your widget ID and tell me what you'd like to achieve with your campaign.
                     </div>
                 </div>
